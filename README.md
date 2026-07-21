@@ -7,6 +7,9 @@ run the TLC model checker, and consume its results — including typed
 counterexample traces with [ITF](https://apalache-mc.org/docs/adr/015adr-trace.html)
 JSON interchange.
 
+A **Rust port** with the same design and semantics — verified against the
+same fixtures and live TLC runs — lives in [rust/](rust/README.md).
+
 ```
 go get github.com/aburan28/tlacuilo
 ```

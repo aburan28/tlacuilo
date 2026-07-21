@@ -1,0 +1,11 @@
+[package]
+name = "tlacuilo"
+version = "0.1.0"
+edition = "2021"
+description = "Pure-Rust toolkit for TLA+: parse, format, and write specs; run TLC; validate implementation traces against specs"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/aburan28/tlacuilo"
+
+[dependencies]
+num-bigint = "0.4"
+serde_json = "1"
