@@ -1,11 +1,15 @@
 name: Tag release
 
-# Creates an annotated tag on a chosen commit. Two triggers:
+# Creates an annotated tag on a chosen commit and a GitHub Release for
+# it. Two triggers:
 #   - workflow_dispatch with tag/sha/message inputs, or
 #   - a commit to main adding a .release-request file whose first line
 #     is: <tag> <sha> [message...]
-# The marker-file path exists for environments whose credentials can
-# commit contents but cannot dispatch workflows or push tag refs.
+# Optional: a .release-notes.md committed alongside the marker becomes
+# the Release notes. Both steps are idempotent (existing tag/Release are
+# left alone), and the marker files are removed when processed. The
+# marker-file path exists for environments whose credentials can commit
+# contents but cannot dispatch workflows or push tag refs.
 
 on:
   workflow_dispatch:
@@ -70,11 +74,33 @@ jobs:
           MSG: ${{ steps.req.outputs.msg }}
         run: |
           set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; leaving it as is."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" "$SHA" -m "$MSG"
           git push origin "refs/tags/$TAG"
           echo "Tagged $SHA as $TAG"
+
+      - name: Create GitHub release
+        if: steps.req.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.req.outputs.tag }}
+          MSG: ${{ steps.req.outputs.msg }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; leaving it as is."
+            exit 0
+          fi
+          if [ -s .release-notes.md ]; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file .release-notes.md
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes "$MSG"
+          fi
 
       - name: Remove processed release request
         if: steps.req.outputs.skip == 'false' && hashFiles('.release-request') != ''
@@ -85,5 +111,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm -q .release-request
+          if [ -f .release-notes.md ]; then
+            git rm -q .release-notes.md
+          fi
           git commit -m "Remove processed release request for $TAG"
           git push origin HEAD:main
