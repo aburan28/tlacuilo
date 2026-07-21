@@ -18,6 +18,7 @@ requires Java and `tla2tools.jar` (see [Running TLC](#running-tlc)).
 
 | Package   | What it does |
 |-----------|--------------|
+| `tracecheck` | Validate Go implementations against TLA+ specs by trace checking (annotate actions, record under a deterministic harness, let TLC judge) |
 | `builder` | Fluent construction of TLA+ specs from Go |
 | `parser`  | Full-expression TLA+ parser (column-aware junction lists, the complete operator precedence table) |
 | `ast`     | Syntax tree + canonical pretty-printer (`parse ∘ print` is a fixed point) |
@@ -118,6 +119,64 @@ Results are decoded from TLC's machine-readable tool protocol
 13 liveness violation). Counterexample states — including liveness lassos
 and stuttering — are parsed into `value.Value` trees using the same TLA+
 parser used for specs.
+
+## Validating Go implementations (trace checking)
+
+Fully automatic Go→TLA+ extraction hits state explosion fast (goroutine
+interleavings, channel semantics). `tracecheck` implements the tractable
+middle ground used by industrial trace-validation work: **annotate**
+actions in your Go code, **record** only under a deterministic test
+harness (never in production), and let TLC decide whether the recorded
+behavior is one the spec allows. The annotations are `tla:"var"` struct
+tags (the variable mapping) and `Recorder.Step("Action", state)` calls
+(the action mapping → refinement mapping in the generated trace spec).
+
+```go
+type controller struct {
+    Desired int `tla:"desired"`
+    Current int `tla:"current"`
+}
+
+rec := tracecheck.NewRecorder()
+rec.InitState(c)
+c.Desired = 3
+rec.StepState("ChangeDesired", c)
+for { // the reconcile loop under a deterministic harness
+    act, ok := c.reconcile()
+    if !ok { break }
+    rec.StepState(act, c) // "ScaleUp" / "ScaleDown"
+}
+
+report, err := tracecheck.Validate(ctx, tracecheck.Spec{
+    Module: "Reconciler",
+    Vars:   []string{"desired", "current"},
+    Actions: map[string]string{ // recorded action -> spec action
+        "ChangeDesired": "ChangeDesired",
+        "ScaleUp":       "ScaleUp",
+        "ScaleDown":     "ScaleDown",
+    },
+    Constants: []cfg.Constant{{Name: "MaxReplicas", Value: "5"}},
+}, rec.Trace(), reconcilerSpecSource, tlc.Options{})
+// report.Conforms, or report.DivergedAt / report.FailedAction
+```
+
+The generated trace module embeds the recording as a constant sequence and
+requires each step to satisfy the abstract action named by its annotation;
+a step the spec cannot take leaves TLC with no successor, so divergence
+surfaces as a TLC deadlock that `Validate` turns into "diverges at state
+N (action X)". Unmentioned variables carry forward automatically, and
+unmapped actions fall back to `[Next]_vars`.
+
+This is exercised end-to-end against three Go tool shapes in
+`tracecheck`'s tests, each with a buggy variant that must be caught: a
+**Kubernetes-style reconcile controller** (scaling two replicas per step
+is caught), a **bounded FIFO queue** (a LIFO pop is caught), and **lock
+discipline** (a stolen lock is caught). Try the controller demo:
+
+```
+go run ./examples/reconciler        # conforms
+go run ./examples/reconciler -bug   # divergence report, exit 1
+```
 
 ## Example
 

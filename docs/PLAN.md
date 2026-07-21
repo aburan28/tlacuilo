@@ -191,7 +191,58 @@ values) from `<-` operator replacement.
 (de)serializes the Apalache ITF JSON format so traces interoperate with the
 broader ecosystem.
 
-### 3.8 builder
+### 3.8 tracecheck — validating Go implementations against specs
+
+The headline use case: check that a Go implementation (a Kubernetes
+controller's reconcile loop, a queue, a lock protocol) actually behaves as
+its TLA+ spec allows.
+
+Fully automatic Go→TLA+ extraction hits state explosion fast — goroutine
+interleavings and channel semantics blow up the model long before it is
+useful. The tractable middle ground (the approach industrial trace
+validation converged on — MongoDB's eXtreme-modelling work, etcd-style
+harnesses) is:
+
+1. **Annotate actions in the Go code** rather than extract them. In Go
+   terms the annotations are `tla:"var"` struct tags on the state (the
+   variable mapping) plus `Recorder.Step("ActionName", state)` calls at
+   action points (the action mapping). PGo is the prior art in the
+   opposite direction (spec → Go); tlacuilo carves out the inverse niche
+   (checking Go against the spec).
+2. **Record only under a deterministic test harness**, never in
+   production — no runtime cost, no interleaving explosion; the harness
+   chooses the schedule, TLC checks conformance of the observed behavior.
+3. **Generate the trace spec + refinement mapping** from the recording:
+   a module that embeds the trace as a constant sequence of records and
+   advances an index, requiring each recorded step to satisfy the
+   abstract action named by its annotation (falling back to `[Next]_vars`
+   for unmapped steps, which also admits stuttering):
+
+   ```tla
+   TraceNext == \/ /\ TraceIdx < Len(Trace)
+                   /\ TraceIdx' = TraceIdx + 1
+                   /\ v' = Trace[TraceIdx + 1].v   \* per mapped variable
+                   /\ TraceMatch(TraceIdx + 1)     \* CASE over action names
+                \/ /\ TraceIdx = Len(Trace)
+                   /\ UNCHANGED TraceVars          \* terminal self-loop
+   ```
+
+   With the terminal self-loop, the *only* way TLC deadlocks is a
+   mid-trace step the spec cannot take — so divergence is detected as
+   `StatusDeadlock`, and `Validate` reads the final `TraceIdx` out of
+   TLC's own counterexample to report the failing step and action.
+   Because the recorder carries unmentioned variables forward, partial
+   per-action annotations still yield total states.
+
+This is exercised against three representative Go tool shapes, each with
+a correct and a buggy variant (`tracecheck/*_test.go`): a
+Kubernetes-style **reconcile controller** (buggy version scales two
+replicas per step — caught), a **bounded FIFO queue** (buggy version pops
+LIFO — caught), and a **lock discipline** (a stolen lock — caught).
+`examples/reconciler` is the runnable controller demo (`-bug` shows a
+divergence report).
+
+### 3.9 builder
 
 A fluent, misuse-resistant layer over `ast`:
 
@@ -243,6 +294,7 @@ when a jar is available, through TLC itself.
 - Semantic checks (symbol resolution, arity, level checking) for
   fail-fast-before-Java feedback.
 - Apalache runner (same cfg/trace machinery, JSON interface).
-- Trace *validation* helpers: emit TLA+ trace specs from Go execution logs to
-  check implementations against specs (the MongoDB/CCF technique).
+- Trace validation extensions: parameterized action mappings (action
+  arguments recorded and passed to spec operators), existential handling of
+  unobserved variables, and ITF-file-based traces for very long recordings.
 - PlusCal parsing/translation; byte-fidelity formatting mode.
