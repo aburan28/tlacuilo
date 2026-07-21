@@ -1,8 +1,11 @@
 name: Tag release
 
-# Manually dispatched: creates an annotated tag on a chosen commit.
-# Useful for cutting releases from environments that cannot push tag
-# refs directly.
+# Creates an annotated tag on a chosen commit. Two triggers:
+#   - workflow_dispatch with tag/sha/message inputs, or
+#   - a commit to main adding a .release-request file whose first line
+#     is: <tag> <sha> [message...]
+# The marker-file path exists for environments whose credentials can
+# commit contents but cannot dispatch workflows or push tag refs.
 
 on:
   workflow_dispatch:
@@ -18,6 +21,9 @@ on:
         description: "Tag message"
         required: false
         default: ""
+  push:
+    branches: [main]
+    paths: [".release-request"]
 
 permissions:
   contents: write
@@ -30,16 +36,54 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create and push annotated tag
+      - name: Resolve release request
+        id: req
         env:
-          TAG: ${{ inputs.tag }}
-          SHA: ${{ inputs.sha }}
-          MSG: ${{ inputs.message }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_SHA: ${{ inputs.sha }}
+          IN_MSG: ${{ inputs.message }}
         run: |
           set -euo pipefail
-          target="${SHA:-$GITHUB_SHA}"
+          if [ -n "${IN_TAG:-}" ]; then
+            tag="$IN_TAG"; sha="${IN_SHA:-$GITHUB_SHA}"; msg="${IN_MSG:-$IN_TAG}"
+          elif [ -s .release-request ]; then
+            read -r tag sha msg < .release-request
+            sha="${sha:-$GITHUB_SHA}"
+            msg="${msg:-$tag}"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No release request; nothing to do."
+            exit 0
+          fi
+          {
+            echo "skip=false"
+            echo "tag=$tag"
+            echo "sha=$sha"
+            echo "msg=$msg"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create and push annotated tag
+        if: steps.req.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.req.outputs.tag }}
+          SHA: ${{ steps.req.outputs.sha }}
+          MSG: ${{ steps.req.outputs.msg }}
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" "$target" -m "${MSG:-$TAG}"
+          git tag -a "$TAG" "$SHA" -m "$MSG"
           git push origin "refs/tags/$TAG"
-          echo "Tagged $target as $TAG"
+          echo "Tagged $SHA as $TAG"
+
+      - name: Remove processed release request
+        if: steps.req.outputs.skip == 'false' && hashFiles('.release-request') != ''
+        env:
+          TAG: ${{ steps.req.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -q .release-request
+          git commit -m "Remove processed release request for $TAG"
+          git push origin HEAD:main
