@@ -1,0 +1,1 @@
+v0.1.0 156002c35b411365a24e3b3bfd47fa97271cf203 tlacuilo v0.1.0 - pure-Go TLA+ toolkit: parser/formatter, builder, TLC runner with typed traces and ITF, tracecheck trace validation, k8s controller verification template, and required TLA+ proof CI
