@@ -73,13 +73,15 @@ type VariableDecl struct {
 type Fixity int
 
 const (
-	Prefix  Fixity = iota // Name(args) == e, or Name == e
-	Infix                 // a ++ b == e
-	Postfix               // a ^+ == e
+	Prefix    Fixity = iota // Name(args) == e, or Name == e
+	Infix                   // a ++ b == e
+	Postfix                 // a ^+ == e
+	PrefixSym               // -. a == e (unary minus), ~ a == e
 )
 
-// OperatorDef is an operator definition. For Fixity == Infix the Name is
-// the operator symbol and Params holds the two operands.
+// OperatorDef is an operator definition. For Fixity == Infix,
+// Postfix, or PrefixSym the Name is the operator symbol and Params
+// holds the operands.
 type OperatorDef struct {
 	StartPos token.Pos
 	Local    bool

@@ -135,7 +135,7 @@ middle ground used by industrial trace-validation work: **annotate**
 actions in your Go code, **record** only under a deterministic test
 harness (never in production), and let TLC decide whether the recorded
 behavior is one the spec allows. The annotations are `tla:"var"` struct
-tags (the variable mapping) and `Recorder.Step("Action", state)` calls
+tags (the variable mapping) and `Recorder.StepState("Action", state)` calls
 (the action mapping → refinement mapping in the generated trace spec).
 
 ```go

@@ -201,9 +201,29 @@ func (p *parser) parseUnit() ast.Unit {
 		return p.parseInstance(false)
 	case token.IDENT:
 		return p.parseDefinition(false, t.Pos)
+	case token.OP:
+		if isDefinablePrefixOp(t.Lit) {
+			return p.parsePrefixOpDef(false, t.Pos)
+		}
 	}
 	p.errorf(t.Pos, "unexpected %s at module level", t)
 	return nil
+}
+
+// isDefinablePrefixOp reports whether op may head a prefix-operator
+// definition: unary minus is written -. in its definition, and ~ (with
+// its \lnot and \neg aliases, canonicalized by the scanner) may be
+// redefined.
+func isDefinablePrefixOp(op string) bool { return op == "-." || op == "~" }
+
+// parsePrefixOpDef parses a prefix-operator definition such as
+// "-. a == 0 - a" (Integers.tla) or "~ a == ...".
+func (p *parser) parsePrefixOpDef(local bool, start token.Pos) ast.Unit {
+	op := p.next().Lit
+	param := p.expect(token.IDENT).Lit
+	p.expect(token.DEFEQ)
+	return &ast.OperatorDef{StartPos: start, Local: local, Fixity: ast.PrefixSym,
+		Name: op, Params: []ast.OpDecl{{Name: param}}, Body: p.parseExpr(0)}
 }
 
 func (p *parser) parseLocalUnit(pos token.Pos) ast.Unit {
@@ -213,6 +233,10 @@ func (p *parser) parseLocalUnit(pos token.Pos) ast.Unit {
 		return u
 	case token.IDENT:
 		return p.parseDefinition(true, pos)
+	case token.OP:
+		if isDefinablePrefixOp(p.cur().Lit) {
+			return p.parsePrefixOpDef(true, pos)
+		}
 	}
 	p.errorf(p.cur().Pos, "expected definition or INSTANCE after LOCAL, found %s", p.cur())
 	return nil
@@ -910,12 +934,14 @@ func (p *parser) parseLet() ast.Expr {
 	l := &ast.Let{StartPos: start}
 	for p.err == nil && p.cur().Kind != token.IN {
 		var d ast.Unit
-		switch p.cur().Kind {
-		case token.IDENT:
+		switch {
+		case p.cur().Kind == token.IDENT:
 			d = p.parseDefinition(false, p.cur().Pos)
-		case token.RECURSIVE:
+		case p.cur().Kind == token.RECURSIVE:
 			pos := p.next().Pos
 			d = &ast.Recursive{StartPos: pos, Decls: p.parseOpDeclList()}
+		case p.cur().Kind == token.OP && isDefinablePrefixOp(p.cur().Lit):
+			d = p.parsePrefixOpDef(false, p.cur().Pos)
 		default:
 			p.errorf(p.cur().Pos, "expected definition or IN in LET, found %s", p.cur())
 			return l

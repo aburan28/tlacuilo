@@ -210,7 +210,7 @@ Options (zero value is sensible):
 | Field | Effect |
 |-------|--------|
 | `JarPath`, `JavaPath`, `JavaOpts` | toolchain overrides (defaults: discovery, `java`, parallel GC) |
-| `Workers` | `-workers N`; negative means `auto` |
+| `Workers` | `-workers N`; negative means `auto` (needs a current TLC — 2.15-era jars reject `auto` and the run comes back `Status: failure`) |
 | `DisableDeadlockCheck` | passes `-deadlock` (TLC's inverted flag: it *disables* the check) |
 | `Simulate`, `SimulateTraces`, `Depth`, `Seed` | simulation mode |
 | `MetaDir`, `ConfigPath`, `ExtraArgs` | plumbing |
@@ -225,10 +225,18 @@ r.Status          // Success | AssumptionViolation | Deadlock |
 r.Ok()            // Status == Success
 r.Err()           // nil, or a descriptive error for non-success
 r.StatesGenerated, r.DistinctStates, r.QueueStates, r.Depth
-r.Errors          // TLC's error messages with their message codes
+r.Errors          // []TLCError{Code int, Message string}
 r.Trace           // *trace.Trace counterexample (nil when none)
-r.Messages        // every framed tool-protocol message, if you need more
+r.Messages        // []Message{Code, Severity, Body}, the full protocol stream
 ```
+
+**TLC version note**: tlacuilo talks to any TLC, but two conveniences
+need a current `tla2tools.jar` (as `EnsureJar` downloads): `-workers
+auto` and the `CHECK_DEADLOCK` config keyword are rejected by old jars
+(TLC 2.15 and earlier), surfacing as `Status: failure` with the TLC
+error in `r.Errors` — not as a Go error. For maximum compatibility
+prefer `Options.DisableDeadlockCheck` (the `-deadlock` flag) over
+`cfg.Config.CheckDeadlock`, as every example in this guide does.
 
 Statuses come from TLC's exit codes (verified against real TLC: 0, 10,
 11, 12, 13, 150+); traces — including liveness lassos (`Trace.Loop`) and
