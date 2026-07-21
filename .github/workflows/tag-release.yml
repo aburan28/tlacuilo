@@ -1,0 +1,45 @@
+name: Tag release
+
+# Manually dispatched: creates an annotated tag on a chosen commit.
+# Useful for cutting releases from environments that cannot push tag
+# refs directly.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name (e.g. v0.1.0)"
+        required: true
+      sha:
+        description: "Commit SHA to tag (defaults to the dispatched ref's head)"
+        required: false
+        default: ""
+      message:
+        description: "Tag message"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push annotated tag
+        env:
+          TAG: ${{ inputs.tag }}
+          SHA: ${{ inputs.sha }}
+          MSG: ${{ inputs.message }}
+        run: |
+          set -euo pipefail
+          target="${SHA:-$GITHUB_SHA}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$target" -m "${MSG:-$TAG}"
+          git push origin "refs/tags/$TAG"
+          echo "Tagged $target as $TAG"
