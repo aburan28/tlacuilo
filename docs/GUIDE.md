@@ -341,7 +341,9 @@ Semantics worth knowing:
 - The first recorded state must satisfy the spec's `Init` unless
   `SkipInit` is set (`InitOperator`/`NextOperator` rename the defaults).
 - Divergence is reported with the failing 1-based state index and its
-  action annotation, extracted from TLC's own counterexample.
+  action annotation, extracted from TLC's own counterexample. Because
+  divergence is detected *as* a TLC deadlock, `Validate` forces deadlock
+  checking on even if the passed `tlc.Options` disable it.
 - `GenModule(spec, tr)` gives you the generated TLA+ trace module and
   `GenConfig(spec)` its TLC config, if you want to inspect, save, or
   check them yourself.
@@ -350,6 +352,11 @@ Semantics worth knowing:
 demo (`-bug` shows a divergence report); `tracecheck`'s tests validate
 three Go tool shapes — reconcile controller, bounded FIFO queue, lock
 discipline — each with a buggy variant caught at the exact expected step.
+`examples/k8scontroller` is the full controller template: embedded spec
+with safety *and* liveness proofs, controller-runtime-shaped reconciler,
+deterministic harness, a caught divergence, and the required-check CI
+workflow (`.github/workflows/tla-proof.yml`) — see its README for the
+pattern ported to a real controller-runtime project.
 
 ## Recipes for your own repo
 

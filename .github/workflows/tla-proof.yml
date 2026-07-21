@@ -1,0 +1,50 @@
+name: TLA+ proof
+
+# Verifies the formal side of the repository on every change:
+#   1. the design proof  — TLC exhaustively model-checks the spec's
+#      invariants and liveness properties over all interleavings;
+#   2. the refinement check — the Go controller's recorded behavior is
+#      trace-validated against the spec.
+#
+# Unlike the main CI job, the TLC toolchain is REQUIRED here: if the jar
+# cannot be fetched, this workflow fails instead of silently skipping
+# the proofs (TLACUILO_REQUIRE_TLC turns skips into failures).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Fetch tla2tools.jar (pinned, with latest fallback)
+        run: |
+          set -e
+          fetch() { curl -fsSL --retry 3 -o /tmp/tla2tools.jar "$1"; }
+          fetch https://github.com/tlaplus/tlaplus/releases/download/v1.7.1/tla2tools.jar \
+            || fetch https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar
+          java -cp /tmp/tla2tools.jar tlc2.TLC -h 2>&1 | head -1 || true
+          echo "TLA2TOOLS_JAR=/tmp/tla2tools.jar" >> "$GITHUB_ENV"
+
+      - name: Model-check the spec and trace-validate the controller
+        env:
+          TLACUILO_REQUIRE_TLC: "1"
+        run: go test -v -count=1 ./examples/k8scontroller/
+
+      - name: Trace-validate the reference implementations
+        env:
+          TLACUILO_REQUIRE_TLC: "1"
+        run: go test -v -count=1 ./tracecheck/

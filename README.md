@@ -185,6 +185,13 @@ go run ./examples/reconciler        # conforms
 go run ./examples/reconciler -bug   # divergence report, exit 1
 ```
 
+**[examples/k8scontroller](examples/k8scontroller)** is the full
+template for controllers: an embedded spec with model-checked safety
+*and* liveness proofs, a controller-runtime-shaped reconciler, the
+deterministic harness, a caught divergence, and the dedicated
+[TLA+ proof CI workflow](.github/workflows/tla-proof.yml) that makes
+the proofs a required check (no silent skips).
+
 ## Example
 
 ```
