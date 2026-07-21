@@ -12,7 +12,13 @@ go get github.com/aburan28/tlacuilo
 ```
 
 No dependencies beyond the Go standard library. Running TLC additionally
-requires Java and `tla2tools.jar` (see [Running TLC](#running-tlc)).
+requires Java and `tla2tools.jar` — `tlc.EnsureJar(ctx)` finds or
+downloads it in one call (see [Running TLC](#running-tlc)).
+
+**[The user guide (docs/GUIDE.md)](docs/GUIDE.md)** walks through every
+feature with copy-paste examples, including how to wire spec checking and
+trace validation into your own project's `go test` and CI; each package
+also ships runnable godoc examples.
 
 ## Packages
 
@@ -110,8 +116,9 @@ if r.Trace != nil {                // typed counterexample
 `tlc.Check` writes the spec and config to a temp dir and runs
 `java -cp tla2tools.jar tlc2.TLC -tool`; `tlc.Run` checks an existing
 `.tla` file. The jar is located via `$TLA2TOOLS_JAR`, the working
-directory, `~/.tlacuilo/`, or the system java directories —
-`tlc.DownloadJar` fetches it from the official GitHub releases.
+directory, `~/.tlacuilo/`, or the system java directories;
+`tlc.EnsureJar` finds it or downloads it from the official GitHub
+releases into `~/.tlacuilo/` in one call.
 
 Results are decoded from TLC's machine-readable tool protocol
 (`@!@!@STARTMSG …` framing), and exit codes are mapped to statuses
@@ -128,7 +135,7 @@ middle ground used by industrial trace-validation work: **annotate**
 actions in your Go code, **record** only under a deterministic test
 harness (never in production), and let TLC decide whether the recorded
 behavior is one the spec allows. The annotations are `tla:"var"` struct
-tags (the variable mapping) and `Recorder.Step("Action", state)` calls
+tags (the variable mapping) and `Recorder.StepState("Action", state)` calls
 (the action mapping → refinement mapping in the generated trace spec).
 
 ```go
@@ -177,6 +184,13 @@ discipline** (a stolen lock is caught). Try the controller demo:
 go run ./examples/reconciler        # conforms
 go run ./examples/reconciler -bug   # divergence report, exit 1
 ```
+
+**[examples/k8scontroller](examples/k8scontroller)** is the full
+template for controllers: an embedded spec with model-checked safety
+*and* liveness proofs, a controller-runtime-shaped reconciler, the
+deterministic harness, a caught divergence, and the dedicated
+[TLA+ proof CI workflow](.github/workflows/tla-proof.yml) that makes
+the proofs a required check (no silent skips).
 
 ## Example
 

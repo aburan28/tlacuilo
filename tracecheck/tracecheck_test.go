@@ -2,6 +2,7 @@ package tracecheck
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -91,14 +92,22 @@ func TestGenModuleRejectsCollisions(t *testing.T) {
 }
 
 // requireTLC skips unless java and tla2tools.jar are available; shared by
-// the per-tool-type validation tests.
+// the per-tool-type validation tests. Setting TLACUILO_REQUIRE_TLC (as
+// the TLA+ proof CI job does) turns the skips into hard failures.
 func requireTLC(t *testing.T) tlc.Options {
 	t.Helper()
+	required := os.Getenv("TLACUILO_REQUIRE_TLC") != ""
 	if _, err := exec.LookPath("java"); err != nil {
+		if required {
+			t.Fatal("TLACUILO_REQUIRE_TLC is set but java is not installed")
+		}
 		t.Skip("java not installed")
 	}
 	jar, err := tlc.FindJar()
 	if err != nil {
+		if required {
+			t.Fatal("TLACUILO_REQUIRE_TLC is set but tla2tools.jar was not found (set TLA2TOOLS_JAR)")
+		}
 		t.Skip("tla2tools.jar not found (set TLA2TOOLS_JAR to enable integration tests)")
 	}
 	return tlc.Options{JarPath: jar}

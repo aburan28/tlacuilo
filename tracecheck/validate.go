@@ -54,6 +54,11 @@ func Validate(ctx context.Context, s Spec, tr *trace.Trace, specSource string, o
 	if err != nil {
 		return nil, err
 	}
+	// Divergence is detected AS a TLC deadlock (the generated trace spec
+	// has no successor exactly when the spec cannot take a recorded
+	// step), so deadlock checking must stay on no matter what the caller
+	// put in opts.
+	opts.DisableDeadlockCheck = false
 	res, err := tlc.Check(ctx, tlc.Job{
 		Module:     m,
 		Config:     GenConfig(s),

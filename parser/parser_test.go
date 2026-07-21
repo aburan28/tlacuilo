@@ -314,6 +314,38 @@ func fmtType(v any) string {
 	return "?"
 }
 
+func TestPrefixOperatorDefinition(t *testing.T) {
+	// As in the standard module Integers.tla: unary minus is defined
+	// with the -. spelling.
+	src := `---- MODULE Ints ----
+LOCAL INSTANCE Naturals
+-. a == 0 - a
+~ b == b = 0
+LOCAL -. c == c
+Abs(n) == LET -. m == 0 - m IN IF n < 0 THEN -n ELSE n
+====
+`
+	m, err := Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := m.Units[1].(*ast.OperatorDef)
+	if !ok || d.Fixity != ast.PrefixSym || d.Name != "-." || len(d.Params) != 1 {
+		t.Fatalf("unit 1 = %#v", m.Units[1])
+	}
+	if d2 := m.Units[3].(*ast.OperatorDef); !d2.Local || d2.Fixity != ast.PrefixSym {
+		t.Fatalf("unit 3 = %#v", m.Units[3])
+	}
+	out1 := m.String()
+	m2, err := Parse(out1)
+	if err != nil {
+		t.Fatalf("reparse failed: %v\n%s", err, out1)
+	}
+	if out2 := m2.String(); out1 != out2 {
+		t.Errorf("not stable:\n%s\n----\n%s", out1, out2)
+	}
+}
+
 func TestNestedModule(t *testing.T) {
 	src := `---- MODULE Outer ----
 VARIABLE x

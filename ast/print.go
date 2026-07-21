@@ -168,6 +168,8 @@ func (p *printer) operatorDef(u *OperatorDef) {
 		p.ws(u.Params[0].Name + " " + u.Name + " " + u.Params[1].Name)
 	case Postfix:
 		p.ws(u.Params[0].Name + " " + u.Name)
+	case PrefixSym:
+		p.ws(u.Name + " " + u.Params[0].Name)
 	default:
 		p.ws(u.Name)
 		if len(u.Params) > 0 {

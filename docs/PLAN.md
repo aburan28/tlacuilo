@@ -95,7 +95,7 @@ github.com/aburan28/tlacuilo
 ├── parser/     recursive-descent + precedence-climbing parser,
 │               junction lists via a column stack
 ├── value/      TLA+ value model (Bool, Int/big, String, ModelValue, Set,
-│               Tuple/Seq, Record, Function, Interval) + parse/format + ITF
+│               Tuple/Seq, Record, Func, Interval) + parse/format + ITF
 ├── cfg/        TLC configuration: struct ⇄ .cfg text (generate and parse)
 ├── trace/      State/Trace types, ITF (JSON) encode/decode
 ├── tlc/        runner: jar discovery/download, option building, streaming
@@ -155,7 +155,7 @@ where precedence requires.
 ### 3.4 value
 
 A closed interface `value.Value` with kinds Bool, Int (`math/big`), String,
-ModelValue, Set, Tuple (= sequence), Record, Function, and Interval (`a..b`).
+ModelValue, Set, Tuple (= sequence), Record, Func, and Interval (`a..b`).
 Values support equality, stable ordering (for canonical set printing),
 TLA+-syntax rendering, and conversion from parsed expressions — which is what
 lets us parse TLC's textual counterexample states (`/\ x = <<[n |-> 0]>>`,
@@ -174,7 +174,7 @@ values) from `<-` operator replacement.
 - `tlc.FindJar()` checks `$TLA2TOOLS_JAR`, the working directory, and
   well-known locations; `tlc.DownloadJar(ctx, dest)` fetches from GitHub
   releases for CI setups.
-- `tlc.Run(ctx, opts)` builds the `java -cp tla2tools.jar tlc2.TLC -tool …`
+- `tlc.Run(ctx, specPath, opts)` builds the `java -cp tla2tools.jar tlc2.TLC -tool …`
   invocation (workers, config, deadlock checking, simulation mode, depth,
   seed, metadir, extra args), streams stdout through the tool-mode parser,
   and returns a typed `Result`: status (mapped from exit code + messages),
@@ -186,10 +186,11 @@ values) from `<-` operator replacement.
 
 ### 3.7 trace + ITF
 
-`trace.Trace{States []State, Loop *int, Kind}` with
-`State{Index, Action, Vars map[string]value.Value}`. `trace.ToITF/FromITF`
-(de)serializes the Apalache ITF JSON format so traces interoperate with the
-broader ecosystem.
+`trace.Trace{Vars []string, States []State, Loop int, Stuttering bool}`
+(Loop is a 0-based lasso index, -1 when absent) with
+`State{Index, Action, Vars map[string]value.Value}`.
+`(*Trace).MarshalITF` / `trace.UnmarshalITF` (de)serialize the Apalache
+ITF JSON format so traces interoperate with the broader ecosystem.
 
 ### 3.8 tracecheck — validating Go implementations against specs
 
@@ -205,8 +206,9 @@ harnesses) is:
 
 1. **Annotate actions in the Go code** rather than extract them. In Go
    terms the annotations are `tla:"var"` struct tags on the state (the
-   variable mapping) plus `Recorder.Step("ActionName", state)` calls at
-   action points (the action mapping). PGo is the prior art in the
+   variable mapping) plus `Recorder.Step("ActionName", updates)` /
+   `Recorder.StepState("ActionName", structState)` calls at action points
+   (the action mapping). PGo is the prior art in the
    opposite direction (spec → Go); tlacuilo carves out the inverse niche
    (checking Go against the spec).
 2. **Record only under a deterministic test harness**, never in
@@ -250,13 +252,13 @@ A fluent, misuse-resistant layer over `ast`:
 m := builder.NewModule("Counter").Extends("Naturals")
 x := builder.ID("x")
 m.Variables("x")
-m.Define("Init", builder.Eq(x, builder.Int(0)))
-m.Define("Next", builder.Eq(builder.Prime(x), builder.Add(x, builder.Int(1))))
+m.Define("Init", builder.Eq(x, builder.Num(0)))
+m.Define("Next", builder.Eq(builder.Prime(x), builder.Plus(x, builder.Num(1))))
 m.Define("Spec", builder.And(
     builder.ID("Init"),
-    builder.Always(builder.Sub(builder.ID("Next"), x)), // [][Next]_x
+    builder.Always(builder.BoxAction(builder.ID("Next"), x)), // [][Next]_x
 ))
-src := m.Module().String()
+src := m.String()
 ```
 
 plus expression helpers for the whole surface (sets, functions, records,
