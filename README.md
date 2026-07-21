@@ -12,7 +12,13 @@ go get github.com/aburan28/tlacuilo
 ```
 
 No dependencies beyond the Go standard library. Running TLC additionally
-requires Java and `tla2tools.jar` (see [Running TLC](#running-tlc)).
+requires Java and `tla2tools.jar` — `tlc.EnsureJar(ctx)` finds or
+downloads it in one call (see [Running TLC](#running-tlc)).
+
+**[The user guide (docs/GUIDE.md)](docs/GUIDE.md)** walks through every
+feature with copy-paste examples, including how to wire spec checking and
+trace validation into your own project's `go test` and CI; each package
+also ships runnable godoc examples.
 
 ## Packages
 
@@ -110,8 +116,9 @@ if r.Trace != nil {                // typed counterexample
 `tlc.Check` writes the spec and config to a temp dir and runs
 `java -cp tla2tools.jar tlc2.TLC -tool`; `tlc.Run` checks an existing
 `.tla` file. The jar is located via `$TLA2TOOLS_JAR`, the working
-directory, `~/.tlacuilo/`, or the system java directories —
-`tlc.DownloadJar` fetches it from the official GitHub releases.
+directory, `~/.tlacuilo/`, or the system java directories;
+`tlc.EnsureJar` finds it or downloads it from the official GitHub
+releases into `~/.tlacuilo/` in one call.
 
 Results are decoded from TLC's machine-readable tool protocol
 (`@!@!@STARTMSG …` framing), and exit codes are mapped to statuses

@@ -82,6 +82,26 @@ func DownloadJar(ctx context.Context, dest string) error {
 	return os.Rename(f.Name(), dest)
 }
 
+// EnsureJar returns a usable tla2tools.jar path, downloading it to
+// ~/.tlacuilo/tla2tools.jar on first use when none can be found. It is
+// the one-call setup for tests and tools that embed tlacuilo:
+//
+//	jar, err := tlc.EnsureJar(ctx)
+func EnsureJar(ctx context.Context) (string, error) {
+	if p, err := FindJar(); err == nil {
+		return p, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("tlc: cannot locate home directory to cache tla2tools.jar: %w", err)
+	}
+	dest := filepath.Join(home, ".tlacuilo", "tla2tools.jar")
+	if err := DownloadJar(ctx, dest); err != nil {
+		return "", fmt.Errorf("tlc: downloading tla2tools.jar: %w", err)
+	}
+	return dest, nil
+}
+
 // Options configures a TLC run. The zero value is usable: it locates the
 // jar via FindJar and runs breadth-first model checking with deadlock
 // checking enabled, one worker, and TLC's defaults.
