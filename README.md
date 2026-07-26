@@ -212,3 +212,7 @@ roadmap (semantic checking, Apalache support, and trace validation are
 planned follow-ups). The TLC output fixtures in `tlc/testdata` are real
 captured `-tool` runs; integration tests execute TLC end-to-end and skip
 automatically when Java or the jar is missing.
+
+## License
+
+[Apache License 2.0](LICENSE) — both the Go library and the Rust port.

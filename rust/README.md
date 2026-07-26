@@ -77,3 +77,5 @@ and the batch-create bug caught at the exact same step.
 - AST nodes don't carry source positions (parse errors still do).
 - `Recorder` state maps use `Into<Value>` conversions instead of Go's
   reflection-based `FromGo`.
+
+Licensed under the [Apache License 2.0](../LICENSE).
