@@ -1,0 +1,42 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Fetch tla2tools.jar (for TLC integration tests)
+        continue-on-error: true
+        run: |
+          curl -fsSL --retry 3 -o /tmp/tla2tools.jar \
+            https://github.com/tlaplus/tlaplus/releases/download/v1.7.1/tla2tools.jar \
+            || curl -fsSL --retry 3 -o /tmp/tla2tools.jar \
+              https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar
+          echo "TLA2TOOLS_JAR=/tmp/tla2tools.jar" >> "$GITHUB_ENV"
+
+      - name: cargo test
+        run: cargo test
