@@ -526,17 +526,13 @@ impl Scanner {
                     self.errorf(pos, "unterminated block comment".into());
                     return;
                 }
-                Some('(') => {
-                    if self.peek() == Some('*') {
-                        self.next_ch();
-                        depth += 1;
-                    }
+                Some('(') if self.peek() == Some('*') => {
+                    self.next_ch();
+                    depth += 1;
                 }
-                Some('*') => {
-                    if self.peek() == Some(')') {
-                        self.next_ch();
-                        depth -= 1;
-                    }
+                Some('*') if self.peek() == Some(')') => {
+                    self.next_ch();
+                    depth -= 1;
                 }
                 _ => {}
             }
