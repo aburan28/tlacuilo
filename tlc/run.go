@@ -60,7 +60,7 @@ func DownloadJar(ctx context.Context, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("downloading tla2tools.jar: HTTP %s", resp.Status)
 	}
@@ -71,9 +71,9 @@ func DownloadJar(ctx context.Context, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {
@@ -283,7 +283,7 @@ func Check(ctx context.Context, job Job, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	specPath := filepath.Join(dir, name+".tla")
 	if err := os.WriteFile(specPath, []byte(src), 0o644); err != nil {

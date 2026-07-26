@@ -440,7 +440,7 @@ func (p *parser) parseExpr(min int) ast.Expr {
 		if info.Lo <= min {
 			return lhs
 		}
-		if prev != nil && overlaps(*prev, info) && !(info.Assoc && op == prevOp) {
+		if prev != nil && overlaps(*prev, info) && (!info.Assoc || op != prevOp) {
 			p.errorf(t.Pos, "operator %s conflicts with preceding operator of overlapping precedence; add parentheses", op)
 			return lhs
 		}

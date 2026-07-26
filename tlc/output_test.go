@@ -17,7 +17,7 @@ func loadFixture(t *testing.T, name string, exitCode int) *Result {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	msgs, err := ParseToolOutput(f, nil)
 	if err != nil {
 		t.Fatal(err)
